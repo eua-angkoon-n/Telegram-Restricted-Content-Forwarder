@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#faf8fd">
+  <title>Telegram Forwarder</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#workspace">Skip to forwarding controls</a>
+  <header class="topbar">
+    <div class="brand" aria-label="Telegram Forwarder">
+      <span class="bloom" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span>Telegram Forwarder</span>
+    </div>
+    <div class="private-label"><span aria-hidden="true">●</span> Private console</div>
+  </header>
+
+  <main class="app-shell">
+    <aside class="account-panel" aria-labelledby="accounts-heading">
+      <div class="section-heading">
+        <div>
+          <p class="context-label">Account setup</p>
+          <h1 id="accounts-heading">Telegram accounts</h1>
+        </div>
+        <span id="account-count" class="count-badge" aria-label="0 saved accounts">0</span>
+      </div>
+
+      <div id="account-empty" class="empty-note">
+        <strong>No saved account</strong>
+        <span>Add your Telegram number to begin.</span>
+      </div>
+      <ul id="account-list" class="account-list" aria-label="Saved accounts"></ul>
+
+      <div class="divider"></div>
+      <form id="phone-form" class="form-stack">
+        <div>
+          <label for="phone">Phone number</label>
+          <input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="+66…" required pattern="\+[1-9][0-9]{3,14}" aria-describedby="phone-help">
+          <p id="phone-help" class="field-help">Use international format with country code.</p>
+        </div>
+        <button class="button primary" type="submit">Send login code</button>
+      </form>
+
+      <form id="code-form" class="form-stack login-step" hidden>
+        <div>
+          <label for="login-code">Telegram login code</label>
+          <input id="login-code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{5,6}" required aria-describedby="code-help">
+          <p id="code-help" class="field-help">Enter the code Telegram sent to your account.</p>
+        </div>
+        <button class="button primary" type="submit">Verify code</button>
+      </form>
+
+      <form id="password-form" class="form-stack login-step" hidden>
+        <div>
+          <label for="login-password">Two-step verification password</label>
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required aria-describedby="password-help">
+          <p id="password-help" class="field-help">Used once for sign-in and never stored.</p>
+        </div>
+        <button class="button primary" type="submit">Complete sign-in</button>
+      </form>
+      <p id="account-message" class="inline-message" role="status" aria-live="polite"></p>
+    </aside>
+
+    <section id="workspace" class="workspace" aria-labelledby="forward-heading">
+      <div class="workspace-heading">
+        <div>
+          <p class="context-label">Forward messages</p>
+          <h2 id="forward-heading">Set the forwarding route</h2>
+          <p>Watch a source channel and re-upload new photo and video media.</p>
+        </div>
+      </div>
+
+      <form id="forward-form" class="forward-form">
+        <div class="field account-field">
+          <label for="forward-account">Account</label>
+          <select id="forward-account" name="phone" required>
+            <option value="">Choose an account</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="source">Source channel</label>
+          <input id="source" name="source" list="channel-options" placeholder="@channel or -100…" required>
+        </div>
+        <div class="field">
+          <label for="destination">Destination channel</label>
+          <input id="destination" name="destination" list="channel-options" placeholder="@channel or -100…" required>
+        </div>
+        <datalist id="channel-options"></datalist>
+        <div class="form-actions">
+          <button id="start-button" class="button primary" type="submit">Start forwarding</button>
+          <button id="stop-button" class="button secondary" type="button" disabled>Stop</button>
+        </div>
+      </form>
+      <p id="forward-message" class="inline-message" role="status" aria-live="polite"></p>
+
+      <section id="status-strip" class="status-strip stopped" aria-labelledby="status-title">
+        <span class="status-symbol" aria-hidden="true">■</span>
+        <div>
+          <h3 id="status-title">Stopped</h3>
+          <p id="status-detail">Waiting for a forwarding job.</p>
+        </div>
+        <span class="bloom small" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      </section>
+
+      <dl class="metrics" aria-label="Forwarding counters">
+        <div><dt>Success</dt><dd id="success-count">0</dd></div>
+        <div><dt>Failed</dt><dd id="failed-count">0</dd></div>
+        <div><dt>Total</dt><dd id="total-count">0</dd></div>
+        <div><dt>Last forwarded</dt><dd id="last-forwarded">—</dd></div>
+      </dl>
+
+      <section class="activity" aria-labelledby="activity-heading">
+        <div class="activity-heading">
+          <div>
+            <h3 id="activity-heading">Activity log</h3>
+            <p>Recent worker events, newest first.</p>
+          </div>
+          <button id="refresh-button" class="button text-button" type="button">Refresh</button>
+        </div>
+        <ol id="activity-list" class="activity-list" aria-live="polite" aria-relevant="additions"></ol>
+        <div id="activity-empty" class="activity-empty">
+          <strong>Waiting for a forwarding job</strong>
+          <span>Start a route to see activity here.</span>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

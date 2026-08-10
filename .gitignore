@@ -1,5 +1,9 @@
 __pycache__/
 *.py[cod]
+.env
+.pytest_cache/
+api.txt
+proxy.txt
 
 # Local Telegram account sessions and personal data
 account/*.session

@@ -1,6 +1,4 @@
-PyQt6
-qasync
-psutil
-aiohttp
-kurigram
-tgcrypto
+fastapi==0.141.1
+uvicorn==0.52.1
+kurigram==2.2.24
+tgcrypto==1.2.5

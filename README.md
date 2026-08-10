@@ -1,60 +1,48 @@
-# Telegram-Restricted-Channels-Message-Forwarder
-A free GUI tool to save and forward posts from Telegram channels which made their content restricted.
+# Telegram Restricted Content Forwarder
 
----
+A private, single-owner Web UI for re-uploading newly received photo and video media from a Telegram source channel to a destination channel. The application is designed to run as one persistent Northflank service.
 
-## ✨ Features
-- Accounts login & management
-- Forward messages from any restricted content channel
-- Forward by channel username / link / channel id
-- Live status & logs UI
+Use only with channels and content you are authorized to access and process. Follow Telegram's terms and applicable law.
 
-## 🚀 Watch it on YouTube 🚀
-[![YouTube](https://img.shields.io/badge/Watch%20on-YouTube-red?logo=youtube&logoColor=white)](https://youtu.be/Ig8gIfSBJFE)
+## Run locally with Docker
 
-## 🚀 Get it from our Website 🚀
-🌐 **Website:** [**https://erfan4lx.com/product/telegram-restricted-content-forwarder/**](https://erfan4lx.com/product/telegram-restricted-content-forwarder/) 
+Create Telegram API credentials at `my.telegram.org`, then run:
 
-# 🚀 How to Use
 ```bash
-pip install -r requirements.txt
-python main.py
+docker build -t telegram-forwarder .
+docker run --rm -p 8080:8080 -v telegram-forwarder-data:/data \
+  -e APP_USERNAME=owner \
+  -e APP_PASSWORD='replace-with-a-long-random-password' \
+  -e TELEGRAM_API_ID=123456 \
+  -e TELEGRAM_API_HASH='replace-with-your-api-hash' \
+  telegram-forwarder
 ```
 
-## 📦 Requirements
-- Python 3.10+
-- Windows 10/11 — Linux/Mac
+Open `http://localhost:8080` and enter the Basic Auth credentials when prompted.
 
-## 📸 Preview ![App Screenshot](screenshot.png)
+Optional environment variables:
 
----
+- `APP_DATA_DIR` — persistent state path; default `/data`
+- `POLL_SECONDS` — source polling interval; default `5`
+- `TELEGRAM_PROXIES` — SOCKS5 proxies as `host:port:username:password`, separated by semicolons or new lines
 
-## 💬 **Connect With Me**
+## Deploy on Northflank
 
-👉 **Telegram:** [**https://t.me/erfan4lx10**](https://t.me/erfan4lx10)
+1. Create a combined service from this repository and select **Dockerfile** build type.
+2. Add runtime secrets from `.env.example`: `APP_USERNAME`, `APP_PASSWORD`, `TELEGRAM_API_ID`, and `TELEGRAM_API_HASH`.
+3. Add public HTTP port `8080`.
+4. Add an HTTP health check for `/healthz` on port `8080`.
+5. Add a **Single Read/Write** persistent volume mounted at `/data`.
+6. Keep the service at **one instance**. Telegram session files must not be opened by multiple replicas.
+7. Deploy and complete Telegram OTP/2FA sign-in from the Web UI.
 
-🌐 **Website:** [**https://erfan4lx.com**](https://erfan4lx.com) 
+The two-step verification password is used only for the sign-in request and is not stored. Telegram session files and account markers are stored on the `/data` volume.
 
-📧 **Email:** [**erfan4lx@gmail.com**](mailto:erfan4lx@gmail.com)
+## Development
 
----
+```bash
+python -m pip install -r requirements-dev.txt
+pytest
+```
 
-🆔My YouTube Channel : https://youtube.com/erfan4lx
-
-🆔My Telegram Channel : https://t.me/erfan4lx_news
-
-⚠️ *Important Disclaimer*
-This project and video are for **educational, research, and administrative purposes only**.  
-It *does not* provide or encourage any method to bypass Telegram privacy settings or access hidden data.  
-Any misuse that violates Telegram’s *Terms of Service* or local laws is strictly prohibited.  
-
-Always use anonymized/test datasets or data you have *explicit consent* to process.
-
-<p align="center">
-  Follow Me On
-</p>
-<p align="center">
-  <a href="https://www.youtube.com/c/erfan4lx?sub_confirmation=1">
-    <img src="https://www.iconsdb.com/icons/preview/black/youtube-4-xxl.png" width="40" height="40">
-  </a>
-</p>
+The test suite covers Web authentication/API workflows, account login persistence, and the forwarding worker lifecycle.
