@@ -1,0 +1,20 @@
+services:
+  app:
+    build:
+      context: .
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      APP_USERNAME: "${APP_USERNAME:?Set APP_USERNAME in .env}"
+      APP_PASSWORD: "${APP_PASSWORD:?Set APP_PASSWORD in .env}"
+      TELEGRAM_API_ID: "${TELEGRAM_API_ID:?Set TELEGRAM_API_ID in .env}"
+      TELEGRAM_API_HASH: "${TELEGRAM_API_HASH:?Set TELEGRAM_API_HASH in .env}"
+      APP_DATA_DIR: /data
+      POLL_SECONDS: "${POLL_SECONDS:-5}"
+      TELEGRAM_PROXIES: "${TELEGRAM_PROXIES:-}"
+    volumes:
+      - telegram-forwarder-data:/data
+    restart: unless-stopped
+
+volumes:
+  telegram-forwarder-data:

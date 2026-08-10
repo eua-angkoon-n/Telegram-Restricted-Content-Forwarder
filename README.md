@@ -20,6 +20,18 @@ docker run --rm -p 8080:8080 -v telegram-forwarder-data:/data \
 
 Open `http://localhost:8080` and enter the Basic Auth credentials when prompted.
 
+### Run with Docker Compose
+
+Copy `.env.example` to `.env`, replace the example credentials, then run:
+
+```bash
+docker compose up --build
+```
+
+Open `http://localhost:8080`. Stop the service with `docker compose down`; the
+Telegram sessions remain in the named volume. Use `docker compose down -v` only
+when you intentionally want to delete the local sessions as well.
+
 Optional environment variables:
 
 - `APP_DATA_DIR` — persistent state path; default `/data`
