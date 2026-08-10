@@ -33,7 +33,16 @@ class telegram_panel:
     def read_proxies_from_file():
         try:
             with open('proxy.txt', 'r', encoding='utf-8') as file:
-                return [line.strip() for line in file if line.strip()]
+                proxies = []
+                for line in file:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    parts = line.split(':')
+                    if len(parts) != 4 or not parts[1].isdigit():
+                        continue
+                    proxies.append(line)
+                return proxies
         except Exception as e:
             print(f"Error reading proxy file: {e}")
             return []
@@ -53,7 +62,12 @@ class telegram_panel:
     @staticmethod
     async def get_proxy(ip=None):
         async def is_valid(proxy_info):
+            if not proxy_info:
+                return False
             return await telegram_panel.check_proxy_req(proxy_info[0], int(proxy_info[1]), proxy_info[2], proxy_info[3])
+
+        if not telegram_panel.read_proxies_from_file():
+            return None, False
 
         if ip:
             proxy_info = telegram_panel.get_proxy_by_ip(ip)
@@ -66,19 +80,23 @@ class telegram_panel:
                 return telegram_panel.build_proxy(proxy_info), False
         return None, False
 
-    
+
     @staticmethod
     def get_proxy_by_ip(ip):
         proxies = telegram_panel.read_proxies_from_file()
+        if not proxies:
+            return None
         for proxy in proxies:
             if ip in proxy:
                 return proxy.split(':')
         return random.choice(proxies).split(':')
 
-    
+
     @staticmethod
     def get_random_proxy():
         proxies = telegram_panel.read_proxies_from_file()
+        if not proxies:
+            return None
         return random.choice(proxies).split(':')
 
 
@@ -252,6 +270,11 @@ class telegram_panel:
         pattern_username = r"^@[a-zA-Z0-9_]{5,}$"
         pattern_invite = r"^t\.me/\+[\w\-]{10,}$"
         return bool(re.match(pattern_username, text)) or bool(re.match(pattern_invite, text))
+
+
+    @staticmethod
+    def is_valid_chat_id(text):
+        return bool(re.match(r"^-?\d+$", text))
 
 
     @staticmethod
