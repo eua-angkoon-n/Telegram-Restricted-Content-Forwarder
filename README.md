@@ -1,60 +1,156 @@
-# Telegram Restricted Content Forwarder
+<p align="center">
+  <img src="icon.jpg" alt="Telegram Restricted Content Forwarder" width="120">
+</p>
 
-A private, single-owner Web UI for re-uploading newly received photo and video media from a Telegram source channel to a destination channel. The application is designed to run as one persistent Northflank service.
+<h1 align="center">Telegram Restricted Content Forwarder</h1>
 
-Use only with channels and content you are authorized to access and process. Follow Telegram's terms and applicable law.
+<p align="center"><strong>A private, self-hosted console for re-uploading newly received Telegram media.</strong></p>
 
-## Run locally with Docker
+<p align="center">
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.11-3776AB?logo=python&amp;logoColor=white" alt="Python 3.11"></a>
+  <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-0.141.1-009688?logo=fastapi&amp;logoColor=white" alt="FastAPI 0.141.1"></a>
+  <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&amp;logoColor=white" alt="Docker ready"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-D2134B.svg" alt="MIT License"></a>
+</p>
 
-Create Telegram API credentials at `my.telegram.org`, then run:
+<p align="center">
+  <a href="#-features">Features</a> ·
+  <a href="#-quick-start">Quick Start</a> ·
+  <a href="#-configuration">Configuration</a>
+</p>
 
-```bash
-docker build -t telegram-forwarder .
-docker run --rm -p 8080:8080 -v telegram-forwarder-data:/data \
-  -e APP_USERNAME=owner \
-  -e APP_PASSWORD='replace-with-a-long-random-password' \
-  -e TELEGRAM_API_ID=123456 \
-  -e TELEGRAM_API_HASH='replace-with-your-api-hash' \
-  telegram-forwarder
+> [!IMPORTANT]
+> Use this project only with channels and content you are authorized to access and process. Follow Telegram's Terms of Service and applicable law.
+
+## ✨ Features
+
+- Private, single-owner Web UI protected by HTTP Basic authentication.
+- Telegram sign-in with OTP and optional two-step verification.
+- Multiple saved Telegram accounts with persistent session storage.
+- Source and destination selection by `@username`, invite link, or numeric chat ID.
+- Re-uploading of new photos, videos, animations, and video notes.
+- Caption and caption-entity preservation for supported media.
+- Live worker status, counters, last-forwarded message ID, and activity logs.
+- Temporary download cleanup after every forwarding attempt.
+- Optional SOCKS5 proxy rotation and graceful Telegram FloodWait handling.
+- Docker health check and persistent-volume support for self-hosted deployment.
+
+## 🔄 How it works
+
+```mermaid
+flowchart LR
+    A[Sign in to Web UI] --> B[Add Telegram account]
+    B --> C[Verify OTP / 2FA]
+    C --> D[Choose source and destination]
+    D --> E[Watch for new media]
+    E --> F[Download temporarily]
+    F --> G[Re-upload to destination]
+    G --> H[Delete temporary file]
 ```
 
-Open `http://localhost:8080` and enter the Basic Auth credentials when prompted.
+When a forwarding job starts, the latest source message becomes the initial checkpoint. The worker then polls for newer messages, so existing history is not copied.
+
+Only one forwarding job can run at a time. The chosen Telegram account must be able to read the source and send media to the destination.
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Docker with Docker Compose
+- Telegram API credentials from `my.telegram.org`
+- A Telegram account with access to both channels
 
 ### Run with Docker Compose
 
-Copy `.env.example` to `.env`, replace the example credentials, then run:
-
 ```bash
-docker compose up --build
+git clone https://github.com/eua-angkoon-n/Telegram-Restricted-Content-Forwarder.git
+cd Telegram-Restricted-Content-Forwarder
+cp .env.example .env
 ```
 
-Open `http://localhost:8080`. Stop the service with `docker compose down`; the
-Telegram sessions remain in the named volume. Use `docker compose down -v` only
-when you intentionally want to delete the local sessions as well.
+On Windows PowerShell, use `Copy-Item .env.example .env` instead of `cp`.
 
-Optional environment variables:
-
-- `APP_DATA_DIR` — persistent state path; default `/data`
-- `POLL_SECONDS` — source polling interval; default `5`
-- `TELEGRAM_PROXIES` — SOCKS5 proxies as `host:port:username:password`, separated by semicolons or new lines
-
-## Deploy on Northflank
-
-1. Create a combined service from this repository and select **Dockerfile** build type.
-2. Add runtime secrets from `.env.example`: `APP_USERNAME`, `APP_PASSWORD`, `TELEGRAM_API_ID`, and `TELEGRAM_API_HASH`.
-3. Add public HTTP port `8080`.
-4. Add an HTTP health check for `/healthz` on port `8080`.
-5. Add a **Single Read/Write** persistent volume mounted at `/data`.
-6. Keep the service at **one instance**. Telegram session files must not be opened by multiple replicas.
-7. Deploy and complete Telegram OTP/2FA sign-in from the Web UI.
-
-The two-step verification password is used only for the sign-in request and is not stored. Telegram session files and account markers are stored on the `/data` volume.
-
-## Development
+Edit `.env` and replace the example credentials, then start the service:
 
 ```bash
+docker compose up --build -d
+```
+
+Open [http://localhost:8080](http://localhost:8080) and enter the `APP_USERNAME` and `APP_PASSWORD` values when prompted.
+
+```bash
+# View logs
+docker compose logs -f
+
+# Stop the service while preserving Telegram sessions
+docker compose down
+```
+
+> [!CAUTION]
+> `docker compose down -v` also deletes the persistent volume and all locally saved Telegram sessions.
+
+## ⚙️ Configuration
+
+| Variable | Required | Default | Description |
+| --- | :---: | --- | --- |
+| `APP_USERNAME` | Yes | — | Username for the private Web UI. |
+| `APP_PASSWORD` | Yes | — | Use a long, random password. |
+| `TELEGRAM_API_ID` | Yes | — | Numeric Telegram application ID. |
+| `TELEGRAM_API_HASH` | Yes | — | Telegram application hash. |
+| `APP_DATA_DIR` | No | `/data` | Persistent sessions, markers, and temporary downloads. |
+| `POLL_SECONDS` | No | `5` | Source polling interval; must be greater than zero. |
+| `TELEGRAM_PROXIES` | No | Empty | SOCKS5 entries separated by semicolons or new lines. |
+| `APP_PORT` | No | `8080` | Host port used by Docker Compose. |
+
+Proxy entries use this format:
+
+```text
+host:port:username:password
+```
+
+When multiple proxies are configured, the application selects one randomly for each Telegram client connection.
+
+## 🖥️ Using the Web UI
+
+1. Sign in with the Web UI credentials configured in `.env`.
+2. Enter a Telegram phone number in international format.
+3. Verify the Telegram login code and enter the 2FA password if requested.
+4. Choose the saved account, source channel, and destination channel.
+5. Select **Start forwarding** and monitor the status, counters, and activity log.
+6. Select **Stop** before removing an account or changing the active route.
+
+The 2FA password is used only for the active sign-in request and is never written to disk.
+
+## 🔐 Security and limitations
+
+- The Web UI entry and all API routes require Basic Auth; `/healthz` and static assets are public.
+- Interactive API documentation and the OpenAPI schema are disabled.
+- Telegram session files contain sensitive credentials; protect and back up the volume appropriately.
+- Temporary media is deleted after each send attempt, including failed attempts.
+- The worker processes only messages received after the current job starts.
+- Unsupported message types are skipped without being forwarded.
+- Forwarding state and activity logs are in memory and reset when the service restarts.
+- Run exactly one application replica against a given data volume.
+
+## 🧪 Development and testing
+
+Python 3.11 is recommended.
+
+```bash
+python -m venv .venv
+
+# Linux / macOS
+source .venv/bin/activate
+
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+
 python -m pip install -r requirements-dev.txt
 pytest
 ```
 
-The test suite covers Web authentication/API workflows, account login persistence, and the forwarding worker lifecycle.
+The test suite covers Web authentication, Telegram account login persistence, account management, forwarding lifecycle, temporary-file cleanup, retry behavior, and FloodWait interruption.
+
+## 📄 License
+
+Distributed under the [MIT License](LICENSE).
