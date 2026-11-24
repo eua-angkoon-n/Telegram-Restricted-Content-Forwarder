@@ -523,3 +523,69 @@ async def test_removing_an_account_logs_out_of_telegram(tmp_path):
     assert client.calls == ["connect", "LogOut", "disconnect"]
     assert not (tmp_path / "account" / f"{phone}.session").exists()
     assert (await service.snapshot())["accounts"] == []
+
+
+class FakeBacklogClient(FakeForwardClient):
+    """Holds one message that arrived while the service was down."""
+
+    async def get_chat_history(self, chat_id, limit=0):
+        self.history_calls += 1
+        if self.history_calls == 1:
+            yield FakePhotoMessage()
+            yield type("Message", (), {"id": 10})()
+        else:
+            yield type("Message", (), {"id": 11})()
+
+
+@pytest.mark.asyncio
+async def test_forwarding_resumes_after_a_restart_where_it_left_off(tmp_path):
+    phone = "+15551234567"
+    save_account(tmp_path, phone)
+    first = make_service(tmp_path, lambda **_: FakeForwardClient())
+
+    await first.start_forwarding(phone, "-1001", "-1002")
+    await wait_for(lambda: first.forward_state["status"] == "running")
+    first.job_file.write_text(
+        json.dumps(
+            {"phone": phone, "source": "-1001", "destination": "-1002", "last_id": 10}
+        )
+    )
+    await first.shutdown()
+    assert first.job_file.exists()
+
+    client = FakeBacklogClient()
+    second = make_service(tmp_path, lambda **_: client)
+    await second.resume_forwarding()
+    await wait_for(lambda: client.sent)
+
+    assert client.sent[0]["chat_id"] == -1002
+    assert json.loads(second.job_file.read_text())["last_id"] == 11
+    await second.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_stopped_job_is_not_resumed(tmp_path):
+    phone = "+15551234567"
+    save_account(tmp_path, phone)
+    first = make_service(tmp_path, lambda **_: FakeForwardClient())
+
+    await first.start_forwarding(phone, "-1001", "-1002")
+    await first.stop_forwarding()
+
+    second = make_service(tmp_path, lambda **_: FakeForwardClient())
+    await second.resume_forwarding()
+
+    assert not second.job_file.exists()
+    assert second.forward_task is None
+
+
+@pytest.mark.asyncio
+async def test_revoked_session_does_not_resume(tmp_path):
+    phone = "+15551234567"
+    save_account(tmp_path, phone)
+    service = make_service(tmp_path, lambda **_: FakeRevokedClient())
+
+    await service.start_forwarding(phone, "-1001", "-1002")
+    await wait_for(lambda: not service.forward_state["active"])
+
+    assert not service.job_file.exists()

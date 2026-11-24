@@ -31,6 +31,9 @@ class ForwardRequest(PhoneRequest):
 def create_app(service, *, username: str, password: str) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app):
+        resume = getattr(service, "resume_forwarding", None)
+        if resume:
+            await resume()
         yield
         shutdown = getattr(service, "shutdown", None)
         if shutdown:

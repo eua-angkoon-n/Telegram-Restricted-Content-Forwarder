@@ -148,9 +148,9 @@ The 2FA password is used only for the active sign-in request and is never writte
 - Interactive API documentation and the OpenAPI schema are disabled.
 - Telegram session files contain sensitive credentials; protect and back up the volume appropriately.
 - Temporary media is deleted after each send attempt, including failed attempts.
-- The worker processes only messages received after the current job starts.
+- The worker processes only messages received after the current job starts, including those that arrive while the service is restarting.
 - Unsupported message types are skipped without being forwarded.
-- Forwarding state and activity logs are in memory and reset when the service restarts.
+- An active forwarding job resumes by itself after a restart; a job stopped from the Web UI does not. Counters and activity logs are in memory and reset.
 - Run exactly one application replica against a given data volume.
 
 ## 🧪 Development and testing

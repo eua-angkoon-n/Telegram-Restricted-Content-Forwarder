@@ -105,6 +105,8 @@ class TelegramService:
         self.accounts_dir = settings.data_dir / "account"
         self.config_dir = settings.data_dir / "data"
         self.downloads_dir = settings.data_dir / "downloads"
+        # The active route and how far it got, so a restart can carry on.
+        self.job_file = settings.data_dir / "forward_job.json"
         for directory in (self.accounts_dir, self.config_dir, self.downloads_dir):
             directory.mkdir(parents=True, exist_ok=True)
 
@@ -114,6 +116,7 @@ class TelegramService:
         self.clients: dict[str, Client] = {}
         self.client_locks: dict[str, asyncio.Lock] = {}
         self.forward_phone: str | None = None
+        self.forward_job: dict = {}
         self.logs = deque(maxlen=200)
         self.forward_task: asyncio.Task | None = None
         self.stop_event = asyncio.Event()
@@ -341,6 +344,33 @@ class TelegramService:
         except errors.UserAlreadyParticipant:
             return await client.get_chat(target)
 
+    def _save_job(self, last_id=None) -> None:
+        self.forward_job["last_id"] = last_id
+        temporary = self.job_file.with_suffix(".tmp")
+        temporary.write_text(json.dumps(self.forward_job), encoding="utf-8")
+        temporary.replace(self.job_file)
+
+    def _clear_job(self) -> None:
+        self.job_file.unlink(missing_ok=True)
+
+    async def resume_forwarding(self) -> None:
+        """Carry on with the job that was running when the service stopped."""
+        try:
+            job = json.loads(self.job_file.read_text(encoding="utf-8"))
+            phone, last_id = job["phone"], job.get("last_id")
+            source = self._parse_chat_target(job["source"])
+            destination = self._parse_chat_target(job["destination"])
+            if phone not in self._list_accounts():
+                raise ServiceError("Account not found.")
+        except FileNotFoundError:
+            return
+        except Exception:
+            self._clear_job()
+            return
+        self.forward_job = job
+        self._launch(phone, source, destination, last_id)
+        self._add_log("info", "Resuming the forwarding job after a restart.")
+
     async def start_forwarding(self, phone: str, source: str, destination: str):
         phone = self._validate_phone(phone)
         if phone not in self._list_accounts():
@@ -350,6 +380,12 @@ class TelegramService:
 
         source_target = self._parse_chat_target(source)
         destination_target = self._parse_chat_target(destination)
+        self.forward_job = {"phone": phone, "source": source, "destination": destination}
+        self._save_job()
+        self._launch(phone, source_target, destination_target)
+        return {"status": "starting"}
+
+    def _launch(self, phone: str, source, destination, last_id=None) -> None:
         self.stop_event = asyncio.Event()
         self.forward_phone = phone
         self.logs.clear()
@@ -363,11 +399,13 @@ class TelegramService:
         )
         self._add_log("info", "Connecting to Telegram…")
         self.forward_task = asyncio.create_task(
-            self._run_forwarding(phone, source_target, destination_target)
+            self._run_forwarding(phone, source, destination, last_id)
         )
-        return {"status": "starting"}
 
     async def stop_forwarding(self):
+        # Stopping on request is final; only a service shutdown leaves the
+        # job behind to be resumed.
+        self._clear_job()
         task = self.forward_task
         if not task or task.done():
             self.forward_state.update(active=False, status="stopped")
@@ -375,6 +413,7 @@ class TelegramService:
         self.forward_state["status"] = "stopping"
         self.stop_event.set()
         await task
+        self._clear_job()
         return {"status": "stopped"}
 
     async def _wait(self, seconds: float) -> None:
@@ -383,22 +422,26 @@ class TelegramService:
         except TimeoutError:
             pass
 
-    async def _run_forwarding(self, phone: str, source, destination) -> None:
-        source_chat = destination_chat = last_id = None
+    async def _run_forwarding(
+        self, phone: str, source, destination, last_id=None
+    ) -> None:
+        source_chat = destination_chat = None
         failures = 0
         try:
             while not self.stop_event.is_set():
                 try:
                     client = await self._get_client(phone)
-                    if last_id is None:
+                    if source_chat is None:
                         source_chat = await self._resolve_chat(client, source)
                         destination_chat = await self._resolve_chat(client, destination)
-                        newest = 0
-                        async for message in client.get_chat_history(
-                            source_chat.id, limit=1
-                        ):
-                            newest = message.id
-                        last_id = newest
+                        if last_id is None:
+                            newest = 0
+                            async for message in client.get_chat_history(
+                                source_chat.id, limit=1
+                            ):
+                                newest = message.id
+                            last_id = newest
+                            self._save_job(last_id)
                         self._add_log(
                             "success", "Forwarding is active and watching for new media."
                         )
@@ -421,6 +464,7 @@ class TelegramService:
                         ):
                             break
                         last_id = message.id
+                        self._save_job(last_id)
                 except REAUTH_ERRORS as exc:
                     await self._drop_client(phone)
                     self.forward_state["status"] = "reauth_required"
@@ -457,7 +501,10 @@ class TelegramService:
             self._add_log("error", f"Forwarding stopped: {exc}")
         finally:
             self.forward_state["active"] = False
-            if self.forward_state["status"] not in ("error", "reauth_required"):
+            if self.forward_state["status"] in ("error", "reauth_required"):
+                # Restarting would only fail the same way.
+                self._clear_job()
+            else:
                 self.forward_state["status"] = "stopped"
                 self._add_log("info", "Forwarding stopped.")
 
