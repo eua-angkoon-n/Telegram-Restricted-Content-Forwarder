@@ -8,6 +8,9 @@ services:
     image: "telegram-forwarder:${IMAGE_TAG:?Set IMAGE_TAG in .env}"
     pull_policy: never
     container_name: tg-forwarder
+    # A dedicated uid: the image's own "app" uid (999) belongs to another
+    # service account on the host, which could then read the session files.
+    user: "10001:10001"
     env_file: .env
     environment:
       APP_DATA_DIR: /data
