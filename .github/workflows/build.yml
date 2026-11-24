@@ -27,9 +27,9 @@ jobs:
       # Plain docker commands: this repository only allows GitHub-owned actions.
       - name: Build and push
         env:
-          IMAGE: ghcr.io/eua-angkoon-n/telegram-forwarder:sha-${{ github.sha }}
+          IMAGE: ghcr.io/eua-angkoon-n/telegram-restricted-content-forwarder:sha-${{ github.sha }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          docker build -t "$IMAGE" .
+          docker build -t "$IMAGE" \n            --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" .
           docker push "$IMAGE"

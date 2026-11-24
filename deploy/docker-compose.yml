@@ -4,7 +4,7 @@ name: tg-forwarder
 
 services:
   app:
-    image: "ghcr.io/eua-angkoon-n/telegram-forwarder:${IMAGE_TAG:?Set IMAGE_TAG in .env}"
+    image: "ghcr.io/eua-angkoon-n/telegram-restricted-content-forwarder:${IMAGE_TAG:?Set IMAGE_TAG in .env}"
     container_name: tg-forwarder
     env_file: .env
     environment:
