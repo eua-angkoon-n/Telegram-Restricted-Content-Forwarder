@@ -22,7 +22,7 @@ jobs:
       - name: Test
         run: |
           python -m pip install --disable-pip-version-check -r requirements-dev.txt
-          pytest
+          python -m pytest
 
       # Plain docker commands: this repository only allows GitHub-owned actions.
       - name: Build and push
