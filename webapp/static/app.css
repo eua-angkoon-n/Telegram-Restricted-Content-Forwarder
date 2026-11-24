@@ -278,7 +278,9 @@ input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible
 .status-strip.stopped { background: var(--danger-soft); border-color: var(--petal); }
 .status-strip.running { background: var(--mint); border-color: oklch(79% 0.065 187.54); }
 .status-strip.starting,
+.status-strip.reconnecting,
 .status-strip.stopping { background: var(--honey); border-color: oklch(80% 0.08 80.61); }
+.status-strip.reauth_required,
 .status-strip.error { background: var(--danger-soft); border-color: var(--primary); }
 .status-symbol { color: var(--primary); }
 .status-strip.running .status-symbol { color: var(--mint-strong); }

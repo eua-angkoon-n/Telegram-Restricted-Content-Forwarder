@@ -30,9 +30,10 @@
 - Source and destination selection by `@username`, invite link, or numeric chat ID.
 - Re-uploading of new photos, videos, animations, and video notes.
 - Caption and caption-entity preservation for supported media.
+- Original sender name, and the forward origin when there is one, added to each forwarded item.
 - Live worker status, counters, last-forwarded message ID, and activity logs.
 - Temporary download cleanup after every forwarding attempt.
-- Optional SOCKS5 proxy rotation and graceful Telegram FloodWait handling.
+- Optional SOCKS5 proxies, automatic reconnection, and graceful Telegram FloodWait handling.
 - Docker health check and persistent-volume support for self-hosted deployment.
 
 ## 🔄 How it works
@@ -108,7 +109,26 @@ Proxy entries use this format:
 host:port:username:password
 ```
 
-When multiple proxies are configured, the application selects one randomly for each Telegram client connection.
+When multiple proxies are configured, each Telegram account always uses the same one, so its session never moves between addresses.
+
+## 📦 Server deployment
+
+Pushes to `main` run the tests and publish `ghcr.io/eua-angkoon-n/telegram-forwarder:sha-<commit>` through GitHub Actions. The server only pulls that image; it never builds.
+
+[`deploy/docker-compose.yml`](deploy/docker-compose.yml) is the production stack. It expects a `.env` beside it with the variables above plus `IMAGE_TAG`, listens on `127.0.0.1:3004` for a reverse proxy, and keeps Telegram sessions in `/srv/tg-forwarder/data`.
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Roll back by setting `IMAGE_TAG` to the previous tag and running the same command.
+
+### Keeping Telegram sessions alive
+
+- The data directory must be persistent. Telegram sessions are stored there, and a lost directory means signing in again.
+- Each account uses one long-lived connection with a fixed device identity, so restarts and upgrades do not look like a new device.
+- Network failures are retried with backoff. If Telegram itself ends the session, the console reports **Sign-in required**.
+- Telegram can still end a session on its own, for example when it is terminated from another device.
 
 ## 🖥️ Using the Web UI
 
@@ -149,7 +169,7 @@ python -m pip install -r requirements-dev.txt
 pytest
 ```
 
-The test suite covers Web authentication, Telegram account login persistence, account management, forwarding lifecycle, temporary-file cleanup, retry behavior, and FloodWait interruption.
+The test suite covers Web authentication, Telegram account login persistence, account management, forwarding lifecycle, sender attribution, session reuse and reconnection, temporary-file cleanup, retry behavior, and FloodWait interruption.
 
 ## 📄 License
 
