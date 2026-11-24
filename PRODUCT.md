@@ -14,7 +14,7 @@ The primary user is the single owner and operator of the deployed service. They 
 
 ## Product Purpose
 
-Provide a private browser-based control panel for signing in to Telegram and forwarding newly received media from a restricted source channel to a destination the operator controls. Success means the operator can deploy the service on Northflank, complete the workflow without desktop access, and understand whether forwarding is healthy.
+Provide a private browser-based control panel for signing in to Telegram and forwarding newly received media from a restricted source channel to a destination the operator controls. Success means the operator can deploy the service on their own server, complete the workflow without desktop access, and understand whether forwarding is healthy.
 
 ## Positioning
 

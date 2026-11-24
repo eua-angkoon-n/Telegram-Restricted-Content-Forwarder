@@ -100,6 +100,8 @@ function statusCopy(status) {
     starting: ["Starting", "Connecting to Telegram and checking the route…"],
     running: ["Active", "Watching the source channel for new media."],
     stopping: ["Stopping", "Finishing the current operation safely…"],
+    reconnecting: ["Reconnecting", "Connection lost. Retrying automatically…"],
+    reauth_required: ["Sign-in required", "Telegram ended this session. Add the account again."],
     error: ["Needs attention", "Review the latest activity message."],
   }[status] || ["Unknown", "Refresh to check the worker state."];
 }
