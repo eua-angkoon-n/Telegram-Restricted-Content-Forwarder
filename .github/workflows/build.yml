@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   build:
@@ -24,12 +23,18 @@ jobs:
           python -m pip install --disable-pip-version-check -r requirements-dev.txt
           python -m pytest
 
-      # Plain docker commands: this repository only allows GitHub-owned actions.
-      - name: Build and push
+      # The image travels as a workflow artifact and is loaded on the server
+      # with `docker load`: the registry refuses pushes from this repository.
+      - name: Build image
         env:
-          IMAGE: ghcr.io/eua-angkoon-n/telegram-restricted-content-forwarder:sha-${{ github.sha }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE: telegram-forwarder:sha-${{ github.sha }}
         run: |
-          echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          docker build -t "$IMAGE" --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" .
-          docker push "$IMAGE"
+          docker build -t "$IMAGE" .
+          docker save "$IMAGE" | gzip > telegram-forwarder.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: telegram-forwarder-image
+          path: telegram-forwarder.tar.gz
+          compression-level: 0
+          retention-days: 30
