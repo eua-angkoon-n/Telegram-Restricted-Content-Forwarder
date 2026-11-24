@@ -113,7 +113,7 @@ When multiple proxies are configured, each Telegram account always uses the same
 
 ## 📦 Server deployment
 
-Pushes to `main` run the tests and publish `ghcr.io/eua-angkoon-n/telegram-forwarder:sha-<commit>` through GitHub Actions. The server only pulls that image; it never builds.
+Pushes to `main` run the tests and publish `ghcr.io/eua-angkoon-n/telegram-restricted-content-forwarder:sha-<commit>` through GitHub Actions. The server only pulls that image; it never builds.
 
 [`deploy/docker-compose.yml`](deploy/docker-compose.yml) is the production stack. It expects a `.env` beside it with the variables above plus `IMAGE_TAG`, listens on `127.0.0.1:3004` for a reverse proxy, and keeps Telegram sessions in `/srv/tg-forwarder/data`.
 
