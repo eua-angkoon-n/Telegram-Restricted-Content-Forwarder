@@ -1,10 +1,12 @@
 # Production stack for the shared VPS. The image is built by GitHub Actions and
-# only pulled here; `compose.yaml` in the repository root is for local use.
+# loaded here with `docker load`; `compose.yaml` in the repository root is for
+# local use.
 name: tg-forwarder
 
 services:
   app:
-    image: "ghcr.io/eua-angkoon-n/telegram-restricted-content-forwarder:${IMAGE_TAG:?Set IMAGE_TAG in .env}"
+    image: "telegram-forwarder:${IMAGE_TAG:?Set IMAGE_TAG in .env}"
+    pull_policy: never
     container_name: tg-forwarder
     env_file: .env
     environment:
