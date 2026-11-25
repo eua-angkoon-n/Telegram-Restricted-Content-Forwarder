@@ -61,6 +61,14 @@ def _origin_label(origin) -> str | None:
     return None
 
 
+def is_video_file(message) -> bool:
+    """Tell whether a message carries a video that was sent as a plain file."""
+    document = getattr(message, "document", None)
+    return bool(document) and (
+        getattr(document, "mime_type", None) or ""
+    ).startswith("video/")
+
+
 def sender_line(message) -> str | None:
     """Describe who posted a message and, for forwards, where it came from."""
     parts = []
@@ -128,6 +136,10 @@ class TelegramService:
             "total": 0,
             "last_forwarded": None,
         }
+        # Imported here because the history job builds on this module.
+        from webapp.backfill import BackfillJob
+
+        self.backfill = BackfillJob(self)
 
     @staticmethod
     def _validate_phone(phone: str) -> str:
@@ -218,6 +230,10 @@ class TelegramService:
             raise ServiceError(
                 "Stop forwarding before signing in to this account again."
             )
+        if self.backfill.uses(phone):
+            raise ServiceError(
+                "Stop the history job before signing in to this account again."
+            )
         previous = self.pending_logins.pop(phone, None)
         if previous:
             await previous.client.disconnect()
@@ -270,6 +286,7 @@ class TelegramService:
         return {
             "accounts": self._list_accounts(),
             "forwarding": {**self.forward_state, "logs": list(self.logs)},
+            "backfill": self.backfill.snapshot(),
         }
 
     def _add_log(self, level: str, message: str) -> None:
@@ -285,6 +302,8 @@ class TelegramService:
         phone = self._validate_phone(phone)
         if self.forward_state["active"]:
             raise ServiceError("Stop forwarding before removing an account.")
+        if self.backfill.state["active"]:
+            raise ServiceError("Stop the history job before removing an account.")
         if phone in self._list_accounts():
             # End the authorization on Telegram's side too, so a removed
             # account does not linger in the user's active sessions.
@@ -529,57 +548,82 @@ class TelegramService:
         except Exception as exc:
             self._add_log("warning", f"Sender name could not be added: {exc}")
 
+    async def _prepare_upload(
+        self, client, message, download_dir: str, *, documents: bool = False
+    ):
+        """Download a message's media and return how to send it again.
+
+        Returns ``(sender, kwargs, path, follow_up)``, or ``None`` when the
+        message carries nothing that is forwarded.
+        """
+        # Appended, never prepended: caption_entities keep their offsets.
+        caption, follow_up = self._caption_with_sender(
+            message.caption, sender_line(message)
+        )
+        if message.photo:
+            path = await message.download(file_name=download_dir)
+            sender = client.send_photo
+            kwargs = {
+                "photo": path,
+                "caption": caption,
+                "caption_entities": message.caption_entities,
+            }
+        elif message.video:
+            path = await message.download(file_name=download_dir)
+            sender = client.send_video
+            kwargs = {
+                "video": path,
+                "caption": caption,
+                "caption_entities": message.caption_entities,
+                "duration": message.video.duration,
+                "width": message.video.width,
+                "height": message.video.height,
+            }
+        elif message.animation:
+            path = await message.download(file_name=download_dir)
+            sender = client.send_animation
+            kwargs = {
+                "animation": path,
+                "caption": caption,
+                "caption_entities": message.caption_entities,
+                "duration": message.animation.duration,
+                "width": message.animation.width,
+                "height": message.animation.height,
+            }
+        elif message.video_note:
+            path = await message.download(file_name=download_dir)
+            sender = client.send_video_note
+            kwargs = {
+                "video_note": path,
+                "duration": message.video_note.duration,
+                "length": message.video_note.length,
+            }
+            # Video notes cannot carry a caption.
+            follow_up = sender_line(message)
+        elif documents and is_video_file(message):
+            path = await message.download(file_name=download_dir)
+            sender = client.send_document
+            kwargs = {
+                "document": path,
+                "caption": caption,
+                "caption_entities": message.caption_entities,
+                "file_name": getattr(message.document, "file_name", None),
+                # Keep it a file, as it was posted.
+                "force_document": True,
+            }
+        else:
+            return None
+        return sender, kwargs, path, follow_up
+
     async def _process_message(self, client, destination_id: int, message) -> bool:
         path = None
-        sender = None
         try:
-            download_dir = f"{self.downloads_dir}{os.sep}"
-            # Appended, never prepended: caption_entities keep their offsets.
-            caption, follow_up = self._caption_with_sender(
-                message.caption, sender_line(message)
+            prepared = await self._prepare_upload(
+                client, message, f"{self.downloads_dir}{os.sep}"
             )
-            if message.photo:
-                path = await message.download(file_name=download_dir)
-                sender = client.send_photo
-                kwargs = {
-                    "photo": path,
-                    "caption": caption,
-                    "caption_entities": message.caption_entities,
-                }
-            elif message.video:
-                path = await message.download(file_name=download_dir)
-                sender = client.send_video
-                kwargs = {
-                    "video": path,
-                    "caption": caption,
-                    "caption_entities": message.caption_entities,
-                    "duration": message.video.duration,
-                    "width": message.video.width,
-                    "height": message.video.height,
-                }
-            elif message.animation:
-                path = await message.download(file_name=download_dir)
-                sender = client.send_animation
-                kwargs = {
-                    "animation": path,
-                    "caption": caption,
-                    "caption_entities": message.caption_entities,
-                    "duration": message.animation.duration,
-                    "width": message.animation.width,
-                    "height": message.animation.height,
-                }
-            elif message.video_note:
-                path = await message.download(file_name=download_dir)
-                sender = client.send_video_note
-                kwargs = {
-                    "video_note": path,
-                    "duration": message.video_note.duration,
-                    "length": message.video_note.length,
-                }
-                # Video notes cannot carry a caption.
-                follow_up = sender_line(message)
-            else:
+            if prepared is None:
                 return True
+            sender, kwargs, path, follow_up = prepared
 
             self.forward_state["total"] += 1
             sent = await sender(chat_id=destination_id, **kwargs)
@@ -610,6 +654,7 @@ class TelegramService:
         if self.forward_task and not self.forward_task.done():
             self.stop_event.set()
             await self.forward_task
+        await self.backfill.shutdown()
         for pending in list(self.pending_logins.values()):
             try:
                 await pending.client.disconnect()

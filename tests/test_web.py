@@ -3,10 +3,27 @@ from fastapi.testclient import TestClient
 from webapp.main import create_app
 
 
+class FakeBackfill:
+    def __init__(self):
+        self.requests = []
+
+    async def resume(self):
+        self.requests.append(("resume",))
+
+    async def start(self, phone, source, destination, restart=False):
+        self.requests.append(("start", phone, source, destination, restart))
+        return {"status": "starting"}
+
+    async def stop(self):
+        self.requests.append(("stop",))
+        return {"status": "stopped"}
+
+
 class FakeTelegramService:
     def __init__(self):
         self.login_requests = []
         self.forward_requests = []
+        self.backfill = FakeBackfill()
 
     async def snapshot(self):
         return {
@@ -148,6 +165,48 @@ def test_stop_rejects_cross_site_form_content_type():
 
     assert response.status_code == 415
     assert service.forward_requests == []
+
+
+def test_history_page_requires_auth():
+    app = create_app(FakeTelegramService(), username="owner", password="secret")
+
+    with TestClient(app) as client:
+        assert client.get("/history").status_code == 401
+
+        response = client.get("/history", auth=("owner", "secret"))
+
+    assert response.status_code == 200
+    assert "Copy history" in response.text
+
+
+def test_owner_can_start_and_stop_a_history_job():
+    service = FakeTelegramService()
+    app = create_app(service, username="owner", password="secret")
+
+    with TestClient(app) as client:
+        auth = ("owner", "secret")
+        route = {
+            "phone": "+15551234567",
+            "source": "@source_channel",
+            "destination": "-1009876543210",
+        }
+        started = client.post("/api/backfill/start", auth=auth, json=route)
+        restarted = client.post(
+            "/api/backfill/start", auth=auth, json={**route, "restart": True}
+        )
+        rejected = client.post("/api/backfill/stop", auth=auth, data={})
+        stopped = client.post("/api/backfill/stop", auth=auth, json={})
+
+    assert started.status_code == 202
+    assert restarted.status_code == 202
+    assert rejected.status_code == 415
+    assert stopped.status_code == 202
+    assert service.backfill.requests == [
+        ("resume",),
+        ("start", "+15551234567", "@source_channel", "-1009876543210", False),
+        ("start", "+15551234567", "@source_channel", "-1009876543210", True),
+        ("stop",),
+    ]
 
 
 def test_api_documentation_is_not_publicly_exposed():
