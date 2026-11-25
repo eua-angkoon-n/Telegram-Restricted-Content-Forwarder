@@ -19,5 +19,7 @@ services:
     volumes:
       # Telegram sessions live here; losing this directory means signing in again.
       - /srv/tg-forwarder/data:/data
-    mem_limit: 256m
+    # Measured at the 256m limit with live forwarding alone; the History job
+    # runs beside it.
+    mem_limit: 512m
     restart: unless-stopped
