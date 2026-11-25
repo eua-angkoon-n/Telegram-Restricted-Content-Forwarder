@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#faf8fd">
+  <title>History · Telegram Forwarder</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/history.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#workspace">Skip to history controls</a>
+  <header class="topbar">
+    <div class="brand" aria-label="Telegram Forwarder">
+      <span class="bloom" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span>Telegram Forwarder</span>
+    </div>
+    <nav class="topnav" aria-label="Pages">
+      <a href="/">Live</a>
+      <a href="/history" aria-current="page">History</a>
+    </nav>
+    <div class="private-label"><span aria-hidden="true">●</span> Private console</div>
+  </header>
+
+  <main class="app-shell single">
+    <section id="workspace" class="workspace" aria-labelledby="history-heading">
+      <div class="workspace-heading">
+        <div>
+          <p class="context-label">Copy history</p>
+          <h1 id="history-heading" class="page-title">Copy what is already there</h1>
+          <p>Re-upload the photo and video media already posted in a source channel, from its first message to its latest, then finish. New posts are left to the live route.</p>
+        </div>
+      </div>
+
+      <form id="history-form" class="forward-form">
+        <div class="field account-field">
+          <label for="history-account">Account</label>
+          <select id="history-account" name="phone" required>
+            <option value="">Choose an account</option>
+          </select>
+          <p id="account-help" class="field-help" hidden>No saved account yet. <a href="/">Add one on the Live page.</a></p>
+        </div>
+        <div class="field">
+          <label for="source">Source channel</label>
+          <input id="source" name="source" list="channel-options" placeholder="@channel or -100…" required>
+        </div>
+        <div class="field">
+          <label for="destination">Destination channel</label>
+          <input id="destination" name="destination" list="channel-options" placeholder="@channel or -100…" required>
+        </div>
+        <datalist id="channel-options"></datalist>
+        <div class="check-field">
+          <input id="restart" name="restart" type="checkbox" aria-describedby="restart-help">
+          <div>
+            <label for="restart">Start over from the first message</label>
+            <p id="restart-help" class="field-help">Leave off to carry on a stopped route where it left off. Starting over sends everything again.</p>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button id="start-button" class="button primary" type="submit">Start copying</button>
+          <button id="stop-button" class="button secondary" type="button" disabled>Stop</button>
+        </div>
+      </form>
+      <p id="history-message" class="inline-message" role="status" aria-live="polite"></p>
+
+      <section id="status-strip" class="status-strip stopped" aria-labelledby="status-title">
+        <span class="status-symbol" aria-hidden="true">■</span>
+        <div>
+          <h2 id="status-title" class="status-title">Stopped</h2>
+          <p id="status-detail">Waiting for a history job.</p>
+        </div>
+        <span class="bloom small" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      </section>
+
+      <dl class="metrics" aria-label="History counters">
+        <div><dt>Success</dt><dd id="success-count">0</dd></div>
+        <div><dt>Failed</dt><dd id="failed-count">0</dd></div>
+        <div><dt>Total</dt><dd id="total-count">0</dd></div>
+        <div><dt>Message reached</dt><dd id="progress">—</dd></div>
+      </dl>
+
+      <section class="activity" aria-labelledby="activity-heading">
+        <div class="activity-heading">
+          <div>
+            <h2 id="activity-heading" class="status-title">Activity log</h2>
+            <p>Recent worker events, newest first.</p>
+          </div>
+          <button id="refresh-button" class="button text-button" type="button">Refresh</button>
+        </div>
+        <ol id="activity-list" class="activity-list" aria-live="polite" aria-relevant="additions"></ol>
+        <div id="activity-empty" class="activity-empty">
+          <strong>Waiting for a history job</strong>
+          <span>Start a route to see activity here.</span>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

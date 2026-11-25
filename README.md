@@ -29,6 +29,7 @@
 - Multiple saved Telegram accounts with persistent session storage.
 - Source and destination selection by `@username`, invite link, or numeric chat ID.
 - Re-uploading of new photos, videos, animations, and video notes.
+- A separate **History** page that copies the media already in a channel, oldest first, with albums kept together.
 - Caption and caption-entity preservation for supported media.
 - Original sender name, and the forward origin when there is one, added to each forwarded item.
 - Live worker status, counters, last-forwarded message ID, and activity logs.
@@ -49,7 +50,7 @@ flowchart LR
     G --> H[Delete temporary file]
 ```
 
-When a forwarding job starts, the latest source message becomes the initial checkpoint. The worker then polls for newer messages, so existing history is not copied.
+When a forwarding job starts, the latest source message becomes the initial checkpoint. The worker then polls for newer messages, so existing history is not copied. Use the [History page](#-copying-existing-history) for what was posted before.
 
 Only one forwarding job can run at a time. The chosen Telegram account must be able to read the source and send media to the destination.
 
@@ -142,15 +143,32 @@ Roll back by setting `IMAGE_TAG` to the previous tag, which is still loaded on t
 
 The 2FA password is used only for the active sign-in request and is never written to disk.
 
+## 📜 Copying existing history
+
+The **History** page (`/history`) re-uploads the media that is already in a source channel. It is a separate job from live forwarding: it has its own status, counters, and log, and both can run at the same time.
+
+1. Open **History**, then choose the saved account, source channel, and destination channel.
+2. Select **Start copying**. The job reads from the first message up to the one that is latest at that moment, then finishes as **Complete**. Messages posted later are not part of it.
+3. **Stop** keeps the job's place. Starting the same account, source, and destination again carries on from there, so nothing is sent twice. Tick **Start over from the first message** to send everything again. Starting a different route discards the saved place.
+
+How the History job differs from live forwarding:
+
+- Photos and videos that were posted as one album are sent as one album.
+- Videos that were posted as files are copied as files. Other files are still skipped.
+- A message that fails three times is skipped and listed in the activity log, and the job moves on. A lost connection or a Telegram rate limit never skips a message.
+
+Every item is downloaded and uploaded again, so a large channel takes a long time, and Telegram may impose rate-limit waits along the way.
+
 ## 🔐 Security and limitations
 
 - The Web UI entry and all API routes require Basic Auth; `/healthz` and static assets are public.
 - Interactive API documentation and the OpenAPI schema are disabled.
 - Telegram session files contain sensitive credentials; protect and back up the volume appropriately.
 - Temporary media is deleted after each send attempt, including failed attempts.
-- The worker processes only messages received after the current job starts, including those that arrive while the service is restarting.
+- The live worker processes only messages received after the current job starts, including those that arrive while the service is restarting. Earlier messages are copied from the History page.
 - Unsupported message types are skipped without being forwarded.
-- An active forwarding job resumes by itself after a restart; a job stopped from the Web UI does not. Counters and activity logs are in memory and reset.
+- An active forwarding or History job resumes by itself after a restart; a job stopped from the Web UI does not. Counters and activity logs are in memory and reset.
+- There is no per-message record of what was sent: starting a History route over, or copying the same source to the same destination twice, sends the items again.
 - Run exactly one application replica against a given data volume.
 
 ## 🧪 Development and testing
@@ -170,7 +188,7 @@ python -m pip install -r requirements-dev.txt
 pytest
 ```
 
-The test suite covers Web authentication, Telegram account login persistence, account management, forwarding lifecycle, sender attribution, session reuse and reconnection, temporary-file cleanup, retry behavior, and FloodWait interruption.
+The test suite covers Web authentication, Telegram account login persistence, account management, forwarding lifecycle, sender attribution, session reuse and reconnection, temporary-file cleanup, retry behavior, FloodWait interruption, and the History job.
 
 ## 📄 License
 

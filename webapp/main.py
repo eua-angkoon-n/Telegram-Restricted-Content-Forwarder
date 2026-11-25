@@ -28,12 +28,19 @@ class ForwardRequest(PhoneRequest):
     destination: str = Field(min_length=1, max_length=256)
 
 
+class BackfillRequest(ForwardRequest):
+    restart: bool = False
+
+
 def create_app(service, *, username: str, password: str) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app):
         resume = getattr(service, "resume_forwarding", None)
         if resume:
             await resume()
+        backfill = getattr(service, "backfill", None)
+        if backfill:
+            await backfill.resume()
         yield
         shutdown = getattr(service, "shutdown", None)
         if shutdown:
@@ -81,6 +88,10 @@ def create_app(service, *, username: str, password: str) -> FastAPI:
     @app.get("/", dependencies=[Depends(require_auth)], include_in_schema=False)
     async def index():
         return FileResponse(static_dir / "index.html")
+
+    @app.get("/history", dependencies=[Depends(require_auth)], include_in_schema=False)
+    async def history():
+        return FileResponse(static_dir / "history.html")
 
     @app.get("/healthz")
     async def healthz():
@@ -134,5 +145,26 @@ def create_app(service, *, username: str, password: str) -> FastAPI:
     )
     async def stop_forwarding():
         return await service.stop_forwarding()
+
+    @app.post(
+        "/api/backfill/start",
+        dependencies=[Depends(require_auth)],
+        status_code=status.HTTP_202_ACCEPTED,
+    )
+    async def start_backfill(payload: BackfillRequest):
+        return await service.backfill.start(
+            payload.phone,
+            payload.source.strip(),
+            payload.destination.strip(),
+            payload.restart,
+        )
+
+    @app.post(
+        "/api/backfill/stop",
+        dependencies=[Depends(require_auth), Depends(require_json)],
+        status_code=status.HTTP_202_ACCEPTED,
+    )
+    async def stop_backfill():
+        return await service.backfill.stop()
 
     return app
